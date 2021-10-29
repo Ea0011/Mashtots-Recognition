@@ -11,7 +11,7 @@ class MashtotsDataModule(pl.LightningDataModule):
     self.test_data = test_set
     self.batch_size = batch_size
 
-  def setup(self):
+  def setup(self, stage = None):
     self.training_set = self.train_data
     self.validation_set = self.val_data
     self.test_set = self.test_data
@@ -20,7 +20,7 @@ class MashtotsDataModule(pl.LightningDataModule):
     return DataLoader(self.training_set, batch_size=self.batch_size, shuffle=True, num_workers=4)
 
   def val_dataloader(self):
-    return DataLoader(self.validation_set, batch_size=self.batch_size, shuffle=True)
+    return DataLoader(self.validation_set, batch_size=self.batch_size, shuffle=False)
 
   def test_dataloader(self):
-    return DataLoader(self.test_set, batch_size=self.batch_size, shuffle=True)
+    return DataLoader(self.test_set, batch_size=self.batch_size, shuffle=False)

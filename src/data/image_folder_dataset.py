@@ -69,14 +69,14 @@ class ImageFolderDataset(Dataset):
     rand_perm = np.random.permutation(num_samples)
     
     if mode == 'train':
-        idx = rand_perm[:num_train]
+      idx = rand_perm[:num_train]
     elif mode == 'val':
-        idx = rand_perm[num_train:num_train+num_valid]
+      idx = rand_perm[num_train:num_train+num_valid]
     elif mode == 'test':
-        idx = rand_perm[num_train+num_valid:]
+      idx = rand_perm[num_train+num_valid:]
 
     if self.limit_files:
-        idx = idx[:self.limit_files]
+      idx = idx[:self.limit_files]
         
     return list(np.array(images)[idx]), list(np.array(labels)[idx])
 
@@ -91,13 +91,13 @@ class ImageFolderDataset(Dataset):
     """
     images, labels = [], []
     for target_class in sorted(class_to_idx.keys()):
-        label = class_to_idx[target_class]
-        target_dir = os.path.join(directory, target_class)
-        for root, _, fnames in sorted(os.walk(target_dir)):
-            for fname in sorted(fnames):
-                path = os.path.join(root, fname)
-                images.append(path)
-                labels.append(label)
+      label = class_to_idx[target_class]
+      target_dir = os.path.join(directory, target_class)
+      for root, _, fnames in sorted(os.walk(target_dir)):
+        for fname in sorted(fnames):
+          path = os.path.join(root, fname)
+          images.append(path)
+          labels.append(label)
 
     images, labels = self.select_split(images, labels, mode)
 

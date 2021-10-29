@@ -10,28 +10,28 @@ from torchvision import utils
 import numpy as np
 
 class HandwrittingRecognitionNet(pl.LightningModule):
-  def __init__(self, hparams):
+  def __init__(self, hparams, **kwargs):
     """
     Initialize the model from a given dict containing all your hparams
     """
     super(HandwrittingRecognitionNet, self).__init__()
     for key in hparams.keys():
-        self.hparams[key]=hparams[key]
+      self.hparams[key]=hparams[key]
 
     self.model = self.build_model(hparams)
-    self.loss_func = torch.nn.CrossEntropyLoss(reduction='mean')
+    self.loss_func = nn.CrossEntropyLoss()
 
     def init_weights(layer):
       if type(layer) in [nn.Conv2d]:
-          nn.init.kaiming_uniform_(layer.weight, nonlinearity="relu")
-          nn.init.constant_(layer.bias, 0.01)
+        nn.init.kaiming_uniform_(layer.weight, nonlinearity="relu")
+        nn.init.constant_(layer.bias, 0.01)
 
       # initialize layer weights
       self.model.apply(init_weights)
 
   def build_model(self, hparams):
     model = nn.Sequential(
-      nn.Conv2d(3, 512, 1),
+      nn.Conv2d(1, 512, 1),
       nn.BatchNorm2d(512),
       nn.ReLU(512),
       nn.Dropout(0.2),
@@ -42,6 +42,9 @@ class HandwrittingRecognitionNet(pl.LightningModule):
       nn.Conv2d(256, 128, 3, padding=1),
       nn.BatchNorm2d(128),
       nn.ReLU(128),
+      nn.AdaptiveAvgPool2d((1, 1)),
+      nn.Conv2d(128, 78, 1),
+      nn.Flatten(),
     )
 
     return model
@@ -57,11 +60,11 @@ class HandwrittingRecognitionNet(pl.LightningModule):
 
   def general_step(self, batch, batch_idx, mode="train"):
     inputs = batch
-    images, labels = inputs["image"], inputs["letter"]
+    images, labels = inputs["image"], inputs["label"]
     
-    predicted_points = self.forward(images)
+    predicted_letter = self.forward(images)
 
-    loss = self.loss_func(predicted_points.view_as(labels), labels)
+    loss = self.loss_func(predicted_letter, labels)
     return loss
 
   def training_step(self, batch, batch_idx):
@@ -87,7 +90,7 @@ class HandwrittingRecognitionNet(pl.LightningModule):
     optimizer = None
 
     if self.hparams["optimizer"] == "SGD":
-        optimizer = torch.optim.SGD(self.model.parameters(), lr=self.hparams["learning_rate"], weight_decay = self.hparams["weight_decay"])
+        optimizer = torch.optim.SGD(self.model.parameters(), momentum=0.9, lr=self.hparams["learning_rate"], weight_decay = self.hparams["weight_decay"])
     if self.hparams["optimizer"] == "Adam":
         optimizer = torch.optim.Adam(self.model.parameters(), lr=self.hparams["learning_rate"], weight_decay = self.hparams["weight_decay"])
     if self.hparams["optimizer"] == "AdamW":

@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 
-from .download_utils import download_dataset
+# from .download_utils import download_dataset
 
 
 class Dataset(ABC):
