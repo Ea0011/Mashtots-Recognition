@@ -1,3 +1,4 @@
+from typing import List, Tuple
 import torch
 import torch.nn as nn
 import pytorch_lightning as pl
@@ -8,6 +9,8 @@ import torch.nn.functional as F
 import matplotlib.pyplot as plt
 from torchvision import utils
 import numpy as np
+from .blocks.res_block import ResBlock
+from .utils.module_builder import ModuleBuilder
 
 class HandwrittingRecognitionNet(pl.LightningModule):
   def __init__(self, hparams, **kwargs):
@@ -18,41 +21,28 @@ class HandwrittingRecognitionNet(pl.LightningModule):
     for key in hparams.keys():
       self.hparams[key]=hparams[key]
 
-    self.model = self.build_model(hparams)
+    self.feature_extractor, self.classifier = self.build_model(hparams)
     self.loss_func = nn.CrossEntropyLoss()
 
-    def init_weights(layer):
-      if type(layer) in [nn.Conv2d]:
-        nn.init.kaiming_uniform_(layer.weight, nonlinearity="relu")
-        nn.init.constant_(layer.bias, 0.01)
+  def build_model(self, hparams) -> Tuple[nn.ModuleList, nn.Sequential]:
+    feature_extractor = ModuleBuilder(ResBlock, hparams["res_block_params"])()
+    output_dim = hparams["res_block_params"][-1]["out_channels"]
 
-      # initialize layer weights
-      self.model.apply(init_weights)
-
-  def build_model(self, hparams):
-    model = nn.Sequential(
-      nn.Conv2d(1, 512, 1),
-      nn.BatchNorm2d(512),
-      nn.ReLU(512),
-      nn.Dropout(0.2),
-      nn.Conv2d(512, 256, 3, padding=1),
-      nn.BatchNorm2d(256),
-      nn.ReLU(256),
-      nn.Dropout(0.2),
-      nn.Conv2d(256, 128, 3, padding=1),
-      nn.BatchNorm2d(128),
-      nn.ReLU(128),
+    classifier = nn.Sequential(
       nn.AdaptiveAvgPool2d((1, 1)),
-      nn.Conv2d(128, 78, 1),
+      nn.Conv2d(output_dim, 78, 1),
       nn.Flatten(),
     )
 
-    return model
+    return feature_extractor, classifier
 
   def forward(self, x):
-    letter = self.model(x)
+    for _, l in enumerate(self.feature_extractor):
+      x = l(x)
 
-    return letter
+    x = self.classifier(x)
+
+    return x
 
   def general_end(self, loss, mode):
     avg_loss = torch.stack([x for x in loss]).mean()
@@ -90,11 +80,33 @@ class HandwrittingRecognitionNet(pl.LightningModule):
     optimizer = None
 
     if self.hparams["optimizer"] == "SGD":
-        optimizer = torch.optim.SGD(self.model.parameters(), momentum=0.9, lr=self.hparams["learning_rate"], weight_decay = self.hparams["weight_decay"])
+      optimizer = torch.optim.SGD(
+        [
+          { "params": self.feature_extractor.parameters() },
+          { "params": self.classifier.parameters() },
+        ],
+        momentum=0.9,
+        lr=self.hparams["learning_rate"],
+        weight_decay = self.hparams["weight_decay"],
+      )
     if self.hparams["optimizer"] == "Adam":
-        optimizer = torch.optim.Adam(self.model.parameters(), lr=self.hparams["learning_rate"], weight_decay = self.hparams["weight_decay"])
+      optimizer = torch.optim.Adam(
+        [
+          { "params": self.feature_extractor.parameters() },
+          { "params": self.classifier.parameters() },
+        ],
+        lr=self.hparams["learning_rate"],
+        weight_decay = self.hparams["weight_decay"],
+      )
     if self.hparams["optimizer"] == "AdamW":
-        optimizer = torch.optim.AdamW(self.model.parameters(), lr=self.hparams["learning_rate"], weight_decay = self.hparams["weight_decay"])
+      optimizer = torch.optim.AdamW(
+        [
+          { "params": self.feature_extractor.parameters() },
+          { "params": self.classifier.parameters() },
+        ],
+        lr=self.hparams["learning_rate"],
+        weight_decay = self.hparams["weight_decay"],
+      )
 
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=5, min_lr=1e-8, verbose=True, factor=0.5)
 
