@@ -9,24 +9,37 @@ import torch.nn.functional as F
 import matplotlib.pyplot as plt
 from torchvision import utils
 import numpy as np
-from .blocks.res_block import ResBlock
+from .blocks.res_block import ResBlock, ResBlockParams
 from .utils.module_builder import ModuleBuilder
+import sys
 
+if sys.version_info >= (3, 8):
+  from typing import TypedDict  # pylint: disable=no-name-in-module
+else:
+  from typing_extensions import TypedDict
+
+HandwrittingRecognitionNetParams = TypedDict(
+  'HandwrittingRecognitionNetParams',
+  learning_rate=float,
+  weight_decay=float,
+  optimizer=str,
+  res_block_params=List[ResBlockParams],
+)
 class HandwrittingRecognitionNet(pl.LightningModule):
-  def __init__(self, hparams, **kwargs):
+  def __init__(self, **hparams):
     """
     Initialize the model from a given dict containing all your hparams
     """
     super(HandwrittingRecognitionNet, self).__init__()
-    for key in hparams.keys():
-      self.hparams[key]=hparams[key]
 
-    self.feature_extractor, self.classifier = self.build_model(hparams)
+    self.save_hyperparameters()
+
+    self.feature_extractor, self.classifier = self.build_model()
     self.loss_func = nn.CrossEntropyLoss()
 
-  def build_model(self, hparams) -> Tuple[nn.ModuleList, nn.Sequential]:
-    feature_extractor = ModuleBuilder(ResBlock, hparams["res_block_params"])()
-    output_dim = hparams["res_block_params"][-1]["out_channels"]
+  def build_model(self) -> Tuple[nn.ModuleList, nn.Sequential]:
+    feature_extractor = ModuleBuilder(ResBlock, self.hparams.res_block_params)()
+    output_dim = self.hparams.res_block_params[-1]["out_channels"]
 
     classifier = nn.Sequential(
       nn.AdaptiveAvgPool2d((1, 1)),
@@ -55,17 +68,21 @@ class HandwrittingRecognitionNet(pl.LightningModule):
     predicted_letter = self.forward(images)
 
     loss = self.loss_func(predicted_letter, labels)
-    return loss
+
+    correct_items = torch.sum(torch.argmax(predicted_letter, dim=1) == labels)
+    return loss, (correct_items / len(labels))
 
   def training_step(self, batch, batch_idx):
-    loss = self.general_step(batch, batch_idx)
+    loss, accuracy = self.general_step(batch, batch_idx)
     self.log('train_loss', loss)
+    self.log('train_accuracy', accuracy * 100)
 
     return loss
   
   def validation_step(self, batch, batch_idx):
-    loss = self.general_step(batch, batch_idx, mode="val")
+    loss, accuracy = self.general_step(batch, batch_idx, mode="val")
     self.log('val_loss', loss)
+    self.log('val_accuracy', accuracy * 100)
 
     return loss
   
@@ -79,36 +96,45 @@ class HandwrittingRecognitionNet(pl.LightningModule):
   def configure_optimizers(self):
     optimizer = None
 
-    if self.hparams["optimizer"] == "SGD":
+    if self.hparams.optimizer == "SGD":
       optimizer = torch.optim.SGD(
         [
           { "params": self.feature_extractor.parameters() },
           { "params": self.classifier.parameters() },
         ],
         momentum=0.9,
-        lr=self.hparams["learning_rate"],
-        weight_decay = self.hparams["weight_decay"],
+        lr=self.hparams.learning_rate,
+        weight_decay = self.hparams.weight_decay,
       )
-    if self.hparams["optimizer"] == "Adam":
+    if self.hparams.optimizer == "Adam":
       optimizer = torch.optim.Adam(
         [
           { "params": self.feature_extractor.parameters() },
           { "params": self.classifier.parameters() },
         ],
-        lr=self.hparams["learning_rate"],
-        weight_decay = self.hparams["weight_decay"],
+        lr=self.hparams.learning_rate,
+        weight_decay = self.hparams.weight_decay,
       )
-    if self.hparams["optimizer"] == "AdamW":
+    if self.hparams.optimizer == "AdamW":
       optimizer = torch.optim.AdamW(
         [
           { "params": self.feature_extractor.parameters() },
           { "params": self.classifier.parameters() },
         ],
-        lr=self.hparams["learning_rate"],
-        weight_decay = self.hparams["weight_decay"],
+        lr=self.hparams.learning_rate,
+        weight_decay = self.hparams.weight_decay,
+      )
+    if self.hparams.optimizer == "RMSProps":
+      optimizer = torch.optim.AdamW(
+        [
+          { "params": self.feature_extractor.parameters() },
+          { "params": self.classifier.parameters() },
+        ],
+        lr=self.hparams.learning_rate,
+        weight_decay = self.hparams.weight_decay,
       )
 
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=5, min_lr=1e-8, verbose=True, factor=0.5)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=5, min_lr=1e-10, verbose=True, factor=0.1)
 
     return {"optimizer": optimizer, "scheduler": scheduler}
 

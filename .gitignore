@@ -5,3 +5,7 @@
 */*/__pycache__/*
 *.zip
 src/lightning_logs/default/
+*/.ipynb_checkpoints/*
+src/.ipynb_checkpoints/handwritting_recognition-checkpoint.ipynb
+src/networks/*/__pycache__/*.pyc
+src/.ipynb_checkpoints/*

@@ -121,10 +121,10 @@ class ImageFolderDataset(Dataset):
     path = self.images[index]
     image = self.load_image_as_numpy(path)
     if self.transform is not None:
-        image = self.transform(image)
+      image = self.transform(image)
     data_dict = {
-        "image": image,
-        "label": label,
+      "image": image,
+      "label": label,
     }
 
     return data_dict
