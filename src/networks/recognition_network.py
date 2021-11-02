@@ -11,6 +11,8 @@ from torchvision import utils
 import numpy as np
 from .blocks.res_block import ResBlock, ResBlockParams
 from .utils.module_builder import ModuleBuilder
+from .utils.visualisations import visualise_predictions
+from data.image_folder_dataset import LABELS
 import sys
 
 if sys.version_info >= (3, 8):
@@ -33,6 +35,9 @@ class HandwrittingRecognitionNet(pl.LightningModule):
     super(HandwrittingRecognitionNet, self).__init__()
 
     self.save_hyperparameters()
+
+    # to log compute graph to tBoard
+    self.example_input_array = torch.zeros((1, 1, 64, 64)).float()
 
     self.feature_extractor, self.classifier = self.build_model()
     self.loss_func = nn.CrossEntropyLoss()
@@ -69,20 +74,24 @@ class HandwrittingRecognitionNet(pl.LightningModule):
 
     loss = self.loss_func(predicted_letter, labels)
 
+    if mode == "val":
+      fig = visualise_predictions(images, labels, predicted_letter, LABELS)
+      self.logger.experiment.add_figure("Pred vs Actual", fig)
+
     correct_items = torch.sum(torch.argmax(predicted_letter, dim=1) == labels)
-    return loss, (correct_items / len(labels))
+    return loss, correct_items / len(labels)
 
   def training_step(self, batch, batch_idx):
     loss, accuracy = self.general_step(batch, batch_idx)
-    self.log('train_loss', loss)
-    self.log('train_accuracy', accuracy * 100)
+    self.log('train_loss', loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
+    self.log('train_accuracy', accuracy * 100, on_step=True, on_epoch=True, prog_bar=True, logger=True)
 
     return loss
   
   def validation_step(self, batch, batch_idx):
     loss, accuracy = self.general_step(batch, batch_idx, mode="val")
-    self.log('val_loss', loss)
-    self.log('val_accuracy', accuracy * 100)
+    self.log('val_loss', loss, prog_bar=True)
+    self.log('val_accuracy', accuracy * 100, prog_bar=True)
 
     return loss
   

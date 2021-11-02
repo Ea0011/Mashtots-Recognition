@@ -13,6 +13,87 @@ import random
 
 from .base_dataset import Dataset
 
+# BIG LIST OF CLASSES
+LABELS = [
+  "Ա",
+  "Բ",
+  "Գ",
+  "Դ",
+  "Ե",
+  "Զ",
+  "Է",
+  "Ը",
+  "Թ",
+  "Ժ",
+  "Ի",
+  "Լ",
+  "Խ",
+  "Ծ",
+  "Կ",
+  "Հ",
+  "Ձ",
+  "Ղ",
+  "Ճ",
+  "Մ",
+  "Յ",
+  "Ն",
+  "Շ",
+  "Ո",
+  "Ու",
+  "Չ",
+  "Պ",
+  "Ջ",
+  "Ռ",
+  "Ս",
+  "Վ",
+  "Տ",
+  "Ր",
+  "Ց",
+  "Փ",
+  "Ք",
+  "Եվ",
+  "Օ",
+  "Ֆ",
+  "ա",
+  "բ",
+  "գ",
+  "դ",
+  "ե",
+  "զ",
+  "է",
+  "ը",
+  "թ",
+  "ժ",
+  "ի",
+  "լ",
+  "խ",
+  "ծ",
+  "կ",
+  "հ",
+  "ձ",
+  "ղ",
+  "ճ",
+  "մ",
+  "յ",
+  "ն",
+  "շ",
+  "ո",
+  "ու",
+  "չ",
+  "պ",
+  "ջ",
+  "ռ",
+  "ս",
+  "վ",
+  "տ",
+  "ր",
+  "ց",
+  "փ",
+  "ք",
+  "և",
+  "օ",
+  "ֆ",
+]
 
 class ImageFolderDataset(Dataset):
   """CIFAR-10 dataset class"""
@@ -29,9 +110,9 @@ class ImageFolderDataset(Dataset):
     self.split = split
     self.limit_files = limit_files
     self.images, self.labels = self.make_dataset(
-        directory=self.root_path,
-        class_to_idx=self.class_to_idx,
-        mode=mode,
+      directory=self.root_path,
+      class_to_idx=self.class_to_idx,
+      mode=mode,
     )
     self.transform = transform
 
@@ -45,8 +126,8 @@ class ImageFolderDataset(Dataset):
       - class_to_idx is a dict that maps class to label
     """
     classes = [d.name for d in os.scandir(directory) if d.is_dir()]
-    classes.sort()
-    class_to_idx = {classes[i]: i for i in range(len(classes))}
+    class_to_idx = {classes[i]: int(classes[i]) for i in range(len(classes))}
+
     return classes, class_to_idx
 
   def select_split(self, images, labels, mode):
@@ -112,7 +193,7 @@ class ImageFolderDataset(Dataset):
   @staticmethod
   def load_image_as_numpy(image_path):
     """Load image from image_path as numpy array"""
-    return np.asarray(Image.open(image_path), dtype=float)
+    return np.asarray(Image.open(image_path), dtype=np.float32)
 
   def __getitem__(self, index):
     data_dict = None
